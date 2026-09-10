@@ -28,7 +28,7 @@ interface PaginationMeta {
     total: number
 }
 
-const API_URL = "https://banket-rent-backend.local/api/catalog-equipment"
+const API_URL = import.meta.env.VITE_API_URL
 
 export function EquipmentCatalog() {
     const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -47,7 +47,7 @@ export function EquipmentCatalog() {
             setError(null)
 
             const response = await fetch(
-              `${API_URL}?page=${page}&per_page=10`
+              `${API_URL}/api/catalog-equipment?page=${page}&per_page=10`
             )
 
             if (!response.ok) {
