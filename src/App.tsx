@@ -1,21 +1,31 @@
-import { Button } from "@/components/ui/button"
+import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { AuthProvider } from "@/context/AuthContext"
+import { Header } from "@/components/Header"
+import { EquipmentCatalog } from "@/components/EquipmentCatalog"
 
-export function App() {
+function HomePage() {
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">Project ready!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        <div className="font-mono text-xs text-muted-foreground">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-      </div>
+    <div className="p-8">
+      <h1 className="text-3xl font-bold">Главная страница</h1>
+      <p className="text-muted-foreground mt-2">Добро пожаловать в Banket Rent</p>
     </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <div className="min-h-screen bg-background text-foreground">
+          <Header />
+          <main className="container mx-auto">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/catalog" element={<EquipmentCatalog />} />
+            </Routes>
+          </main>
+        </div>
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
