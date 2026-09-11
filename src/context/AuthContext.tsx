@@ -90,9 +90,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error("Unauthorized")
             }
 
-            const user = await response.json()
+            const result = await response.json();
 
-            saveAuthData(token, user)
+            if (!response.ok) throw new Error(result.message);
+
+            const user = result.data
+            console.log(user)
+
+            setUser(user)
+            setIsLoggedIn(true)
         } catch (error) {
             console.error("Auth check failed:", error)
             deleteAuthData()
@@ -100,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const saveAuthData = (newToken: string, newUser: AuthUser) => {
+        console.log(newToken, newUser)
         localStorage.setItem("token", newToken)
         localStorage.setItem("user", JSON.stringify(newUser))
         setToken(newToken)
