@@ -1,6 +1,6 @@
 import type { FormEvent } from "react"
 import { useState, useEffect } from "react"
-import { Mail, Lock, User as UserIcon, KeyRound, Loader2 } from "lucide-react"
+import { /*Mail,*/ Lock, User as UserIcon, KeyRound, Loader2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import {
     Dialog,
@@ -13,10 +13,11 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
 export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const { loginWithEmail, registerInit, registerConfirm } = useAuth()
+    const { loginWithLogin, /*loginWithEmail,*/ registerInit, registerConfirm } = useAuth()
 
     const [mode, setMode] = useState<"login" | "register" | "otp">("login")
     const [name, setName] = useState("")
+    const [login, setLogin] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [otpCode, setOtpCode] = useState("")
@@ -28,6 +29,7 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
         if (!isOpen) {
             setMode("login")
             setName("")
+            setLogin("fingli")
             setEmail("")
             setPassword("")
             setOtpCode("")
@@ -49,7 +51,8 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                 await registerInit(name, email, password)
                 setMode("otp")
             } else {
-                await loginWithEmail(email, password)
+                await loginWithLogin(login, password)
+                //await loginWithEmail(email, password)
                 onClose()
             }
         } catch (err) {
@@ -75,7 +78,7 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                             ? `Мы отправили 6-значный код на ${email}`
                             : mode === "register"
                                 ? "Введите ваши данные для регистрации"
-                                : "Введите e-mail и пароль для входа"}
+                                : "Введите логин и пароль для входа"}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -118,7 +121,16 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                     {mode !== "otp" && (
                         <>
                             <div className="relative">
-                                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <UserIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  type="text"
+                                  placeholder="Логин"
+                                  value={login}
+                                  onChange={(e) => setLogin(e.target.value)}
+                                  required
+                                  className="pl-9"
+                                />
+                                {/*<Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     type="email"
                                     placeholder="Email адрес"
@@ -126,7 +138,7 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     className="pl-9"
-                                />
+                                />*/}
                             </div>
 
                             <div className="relative">

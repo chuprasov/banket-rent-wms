@@ -47,7 +47,13 @@ export function EquipmentCatalog() {
             setError(null)
 
             const response = await fetch(
-              `${API_URL}/api/catalog-equipment?page=${page}&per_page=10`
+              `${API_URL}/api/catalog-equipment?page=${page}&per_page=50`/*, {
+                  method: "GET",
+                  headers: {
+                      Authorization: `Bearer ${userToken}`,
+                      "Content-Type": "application/json",
+                  },
+              }*/
             )
 
             if (!response.ok) {
@@ -121,7 +127,7 @@ export function EquipmentCatalog() {
     }
 
     return (
-      <div className="p-6 md:p-10 space-y-6 max-w-6xl mx-auto">
+      <div className="p-6 md:p-10 space-y-6 max-w-none mx-auto">
           <div>
               {/*<h1 className="text-3xl font-serif font-bold tracking-tight">
                   Каталог оборудования

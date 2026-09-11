@@ -2,14 +2,9 @@ import type { ReactNode } from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 
 interface AuthUser {
+    login?: string
     name?: string
     email?: string
-    [key: string]: unknown
-}
-
-interface Note {
-    title?: string
-    createdAt: string
     [key: string]: unknown
 }
 
@@ -18,9 +13,7 @@ interface AuthContextValue {
     user: AuthUser | null
     isLoggedIn: boolean
     isLoading: boolean
-    notes: Note[]
-    isNotesLoading: boolean
-    loadNotes: () => Promise<void>
+    loginWithLogin: (login: string, password: string) => Promise<void>
     loginWithEmail: (email: string, password: string) => Promise<void>
     registerInit: (name: string, email: string, password: string) => Promise<void>
     registerConfirm: (email: string, code: string) => Promise<void>
@@ -29,12 +22,13 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const API_URL = "https://notepad-njs.fcqdaqp.online/api/v2"
+const API_URL = import.meta.env.VITE_API_URL
 
 const routes = {
-    login: `${API_URL}/login`,
+    login: `${API_URL}/api/auth/login`,
     registerInit: `${API_URL}/register-init`,
     registerConfirm: `${API_URL}/register-confirm`,
+    logout: `${API_URL}/api/auth/logout`,
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -43,33 +37,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoggedIn, setIsLoggedIn] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
 
-    const [notes, setNotes] = useState<Note[]>([])
-    const [isNotesLoading, setIsNotesLoading] = useState(false)
-
-    const checkToken = () => {
-        return localStorage.getItem("token")
-    }
-
     useEffect(() => {
-        const initAuth = () => {
+        const initAuth = async () => {
             try {
                 const savedToken = localStorage.getItem("token")
                 const savedUser = localStorage.getItem("user")
 
-                if (savedToken && savedUser) {
-                    setToken(savedToken)
-                    setUser(JSON.parse(savedUser))
-                    setIsLoggedIn(true)
+                if (!savedToken) {
+                    return
                 }
+
+                setToken(savedToken)
+                if (savedUser) setUser(JSON.parse(savedUser))
+
+                await checkAuth()
             } catch (error) {
-                console.error("[AUTH ERROR] Failed to parse auth data:", error)
+                console.error("[AUTH ERROR] Failed to initialize auth:", error)
+
+                localStorage.removeItem("token")
+                localStorage.removeItem("user")
+
+                setToken(null)
+                setUser(null)
+                setIsLoggedIn(false)
             } finally {
                 setIsLoading(false)
             }
         }
 
-        initAuth()
+        void initAuth()
     }, [])
+
+    const checkAuth = async () => {
+        const token = localStorage.getItem("token")
+
+        if (!token) {
+            return
+        }
+
+        try {
+            const response = await fetch(
+              `${API_URL}/api/auth/me`,
+              {
+                  headers: {
+                      Accept: "application/json",
+                      Authorization: `Bearer ${token}`,
+                  },
+              }
+            )
+
+            if (!response.ok) {
+                throw new Error("Unauthorized")
+            }
+
+            const user = await response.json()
+
+            saveAuthData(token, user)
+        } catch (error) {
+            console.error("Auth check failed:", error)
+            deleteAuthData()
+        }
+    }
 
     const saveAuthData = (newToken: string, newUser: AuthUser) => {
         localStorage.setItem("token", newToken)
@@ -79,43 +107,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoggedIn(true)
     }
 
-    const loadNotes = async () => {
-        setIsNotesLoading(true)
+    const deleteAuthData = () => {
+        localStorage.removeItem("token")
+        localStorage.removeItem("user")
+        setToken(null)
+        setUser(null)
+        setIsLoggedIn(false)
+    }
 
-        const userToken = token || checkToken()
-        if (!userToken) {
-            setIsNotesLoading(false)
-            return
-        }
-
+    const loginWithLogin = async (login: string, password: string) => {
         try {
-            const response = await fetch(`${API_URL}/notes`, {
-                method: "GET",
-                headers: {
-                    Authorization: `Bearer ${userToken}`,
-                    "Content-Type": "application/json",
-                },
+            const response = await fetch(routes.login, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ login, password }),
             })
 
-            if (!response.ok) throw new Error(`Server Error: ${response.status}`)
+            const text = await response.text()
+            const data = text ? JSON.parse(text) : {}
 
-            const apiNotes: Note[] = await response.json()
+            if (!response.ok) {
+                throw new Error(data.message || "Login failed")
+            }
 
-            const sortedNotes = (Array.isArray(apiNotes) ? apiNotes : [])
-                .map((note) => ({
-                    ...note,
-                    createdAt: note.createdAt || new Date().toISOString(),
-                }))
-                .sort(
-                    (a, b) =>
-                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                )
-
-            setNotes(sortedNotes)
-        } catch (err) {
-            console.warn("Server unavailable", err instanceof Error ? err.message : String(err))
-        } finally {
-            setIsNotesLoading(false)
+            saveAuthData(data.access_token, data.user)
+        } catch (error) {
+            console.error("[AUTH ERROR] Login failed:", error)
+            throw error
         }
     }
 
@@ -183,13 +201,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }
 
-    const logout = () => {
-        localStorage.removeItem("token")
-        localStorage.removeItem("user")
-        setToken(null)
-        setUser(null)
-        setIsLoggedIn(false)
-        setNotes([])
+    const logout = async () => {
+        try {
+            const response = await fetch(routes.logout, {
+                method: "POST",
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            })
+
+            const text = await response.text()
+            const data = text ? JSON.parse(text) : {}
+
+            if (!response.ok) {
+                throw new Error(data.message || "Logout failed")
+            }
+
+            deleteAuthData()
+        } catch (error) {
+            console.error("[AUTH ERROR] Logout failed:", error)
+            throw error
+        }
     }
 
     return (
@@ -199,9 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 user,
                 isLoggedIn,
                 isLoading,
-                notes,
-                isNotesLoading,
-                loadNotes,
+                loginWithLogin,
                 loginWithEmail,
                 registerInit,
                 registerConfirm,

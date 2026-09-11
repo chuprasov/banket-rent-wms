@@ -18,7 +18,7 @@ export default function App() {
       <BrowserRouter>
         <div className="min-h-screen bg-background text-foreground">
           <Header />
-          <main className="container mx-auto">
+          <main className="container w-full">
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/catalog" element={<EquipmentCatalog />} />
