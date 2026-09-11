@@ -12,6 +12,7 @@ import {
 import { NavigationMenu } from "@/components/NavigationMenu"
 import { AuthModal } from "@/components/AuthModal"
 import { useAuth } from "@/context/AuthContext"
+import logo from "@/assets/top-logo.png"
 
 export function Header() {
     const { isLoggedIn, user, logout } = useAuth()
@@ -44,12 +45,15 @@ export function Header() {
 
                     <Link
                         to="/"
-                        className="flex items-center gap-2 text-xl font-serif font-bold tracking-wider text-foreground hover:opacity-90 transition-opacity"
+                        className="flex min-w-0 items-center hover:opacity-90 transition-opacity"
                     >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/40 bg-primary/10">
-                            <UtensilsCrossed className="h-4 w-4 text-primary" />
-                        </div>
-                        <span>Banket Rent</span>
+                        <img
+                            src={logo}
+                            alt="Banket Rent"
+                            width={437}
+                            height={97}
+                            className="h-auto w-40 sm:w-52"
+                        />
                     </Link>
                 </div>
                 {/*<div className="flex flex-1 max-w-xl items-center mx-4">

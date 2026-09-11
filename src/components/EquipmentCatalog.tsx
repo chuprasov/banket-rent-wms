@@ -50,7 +50,7 @@ export function EquipmentCatalog() {
               `${API_URL}/api/catalog-equipment?page=${page}&per_page=50`/*, {
                   method: "GET",
                   headers: {
-                      Authorization: `Bearer ${userToken}`,
+                      Authorization: `Bearer ${token}`,
                       "Content-Type": "application/json",
                   },
               }*/
