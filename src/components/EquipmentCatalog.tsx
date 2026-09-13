@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Search, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { useAuth } from "@/context/AuthContext"
 import {
     Table,
     TableBody,
@@ -31,6 +32,7 @@ interface PaginationMeta {
 const API_URL = import.meta.env.VITE_API_URL
 
 export function EquipmentCatalog() {
+    const { token } = useAuth()
     const [equipment, setEquipment] = useState<Equipment[]>([])
     const [pagination, setPagination] = useState<PaginationMeta | null>(null)
     const [searchQuery, setSearchQuery] = useState("")
@@ -38,7 +40,7 @@ export function EquipmentCatalog() {
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        loadEquipment()
+        void loadEquipment()
     }, [])
 
     const loadEquipment = async (page = 1) => {
@@ -46,17 +48,27 @@ export function EquipmentCatalog() {
             setIsLoading(true)
             setError(null)
 
+            if (!token) {
+                throw new Error("Для просмотра оборудования необходимо войти в аккаунт")
+            }
+
             const response = await fetch(
-              `${API_URL}/api/catalog-equipment?page=${page}&per_page=50`/*, {
-                  method: "GET",
+              `${API_URL}/api/catalog-equipment?page=${page}&per_page=50`,
+              {
                   headers: {
+                      Accept: "application/json",
                       Authorization: `Bearer ${token}`,
-                      "Content-Type": "application/json",
                   },
-              }*/
+              }
             )
 
             if (!response.ok) {
+                if (response.status === 401) {
+                    throw new Error("Сессия истекла. Войдите в аккаунт повторно")
+                }
+                if (response.status === 403) {
+                    throw new Error("Нет доступа к каталогу оборудования")
+                }
                 throw new Error("Не удалось загрузить оборудование")
             }
 

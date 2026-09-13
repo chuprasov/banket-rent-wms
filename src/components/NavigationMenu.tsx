@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 import {
     Collapsible,
     CollapsibleContent,
@@ -9,6 +10,9 @@ import {
 
 export function NavigationMenu({ onNavigate }: { onNavigate?: () => void }) {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const { isLoggedIn, isLoading } = useAuth()
+
+    if (isLoading || !isLoggedIn) return null
 
     return (
         <nav className="flex flex-col gap-2 mt-6 w-full">
@@ -32,7 +36,7 @@ export function NavigationMenu({ onNavigate }: { onNavigate?: () => void }) {
 
                 <CollapsibleContent className="pl-4 space-y-1 mt-1 w-full">
                     <Link
-                        to="/settings/storages"
+                        to="/settings/warehouses"
                         onClick={onNavigate}
                         className="flex w-full items-center py-2 px-3 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
                     >
