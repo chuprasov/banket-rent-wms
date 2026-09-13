@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
+import { CatalogRecordDialog } from "@/components/CatalogRecordDialog"
+import { catalogRequest } from "@/lib/catalog-api"
 import {
     Table,
     TableBody,
@@ -26,6 +28,7 @@ export function Warehouses() {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [reload, setReload] = useState(0)
+    const [editor, setEditor] = useState<{ mode: "create" | "edit" | "delete"; item?: Warehouse } | null>(null)
 
     useEffect(() => {
         const controller = new AbortController()
@@ -86,6 +89,26 @@ export function Warehouses() {
     return (
         <div className="p-6 md:p-10 space-y-6 max-w-none mx-auto">
             <h1 className="text-3xl font-serif font-bold tracking-tight">Настройка складов</h1>
+            <Button onClick={() => setEditor({ mode: "create" })}>Добавить склад</Button>
+            {editor && (
+                <CatalogRecordDialog
+                    title={editor.mode === "delete" ? "Удаление склада" : editor.mode === "edit" ? "Редактирование склада" : "Новый склад"}
+                    deleteName={editor.mode === "delete" ? editor.item!.name : undefined}
+                    fields={[
+                        { name: "name", label: "Название", required: true, maxLength: 255 },
+                        { name: "address", label: "Адрес", required: true, maxLength: 255 },
+                        { name: "phone", label: "Телефон", required: true, type: "tel", maxLength: 50 },
+                    ]}
+                    initialValues={{ name: editor.item?.name ?? "", address: editor.item?.address ?? "", phone: editor.item?.phone ?? "" }}
+                    onClose={() => setEditor(null)}
+                    onSubmit={async (values) => {
+                        const path = editor.mode === "create" ? "warehouses" : `warehouses/${encodeURIComponent(String(editor.item!.id))}`
+                        await catalogRequest(path, token, editor.mode === "create" ? "POST" : editor.mode === "edit" ? "PATCH" : "DELETE",
+                            editor.mode === "delete" ? undefined : values)
+                        setReload((value) => value + 1)
+                    }}
+                />
+            )}
 
             <div className="border border-border rounded-lg overflow-hidden bg-card">
                 <Table>
@@ -94,12 +117,13 @@ export function Warehouses() {
                             <TableHead>Название</TableHead>
                             <TableHead>Адрес</TableHead>
                             <TableHead>Телефон</TableHead>
+                            <TableHead className="text-right">Действия</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center py-12">
+                                <TableCell colSpan={4} className="text-center py-12">
                                     <div role="status" className="flex items-center justify-center gap-2 text-muted-foreground">
                                         <Loader2 className="h-5 w-5 animate-spin" />
                                         Загрузка складов...
@@ -108,7 +132,7 @@ export function Warehouses() {
                             </TableRow>
                         ) : error ? (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center py-8">
+                                <TableCell colSpan={4} className="text-center py-8">
                                     <p role="alert" className="text-destructive mb-3">{error}</p>
                                     <Button variant="outline" onClick={() => setReload((value) => value + 1)}>
                                         Повторить загрузку
@@ -117,7 +141,7 @@ export function Warehouses() {
                             </TableRow>
                         ) : warehouses.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                                     Склады не найдены
                                 </TableCell>
                             </TableRow>
@@ -126,6 +150,12 @@ export function Warehouses() {
                                 <TableCell className="font-medium">{warehouse.name}</TableCell>
                                 <TableCell className="whitespace-normal">{warehouse.address || "—"}</TableCell>
                                 <TableCell>{warehouse.phone || "—"}</TableCell>
+                                <TableCell>
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="outline" size="sm" onClick={() => setEditor({ mode: "edit", item: warehouse })}>Изменить</Button>
+                                        <Button variant="destructive" size="sm" onClick={() => setEditor({ mode: "delete", item: warehouse })}>Удалить</Button>
+                                    </div>
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
