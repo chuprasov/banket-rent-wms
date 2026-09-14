@@ -10,7 +10,7 @@ const { catalogRequest } = await import(`data:text/javascript;base64,${Buffer.fr
 test("CRUD requests and API failures", async (t) => {
     const fetchMock = t.mock.method(globalThis, "fetch")
     for (const [method, path, body, status] of [
-        ["POST", "warehouses", { name: "Склад", address: "Москва", phone: "+7" }, 201],
+        ["POST", "warehouses", { name: "Склад", address: "Москва" }, 201],
         ["PATCH", "catalog-equipment/3", { name: "Стул", code: "001", rent_price: "0", balance: 0 }, 200],
         ["DELETE", "warehouses/1", undefined, 204],
     ]) {

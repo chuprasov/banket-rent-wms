@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { Menu, User, LogOut, UtensilsCrossed } from "lucide-react"
+import { Menu, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     Sheet,
@@ -31,11 +31,15 @@ export function Header() {
 
                         <SheetContent side="left" className="w-[300px] sm:w-[350px]">
                             <SheetHeader>
-                                <SheetTitle className="flex items-center gap-2 text-xl font-serif font-bold text-foreground">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/40 bg-primary/10">
-                                        <UtensilsCrossed className="h-4 w-4 text-primary" />
-                                    </div>
-                                    <span>Banket Rent</span>
+                                <SheetTitle
+                                  className="flex items-center gap-2 text-xl font-serif font-bold text-foreground">
+                                    <img
+                                      src={logo}
+                                      alt="Banket Rent"
+                                      width={437}
+                                      height={97}
+                                      className="h-auto w-40 sm:w-52"
+                                    />
                                 </SheetTitle>
                             </SheetHeader>
 
@@ -44,8 +48,8 @@ export function Header() {
                     </Sheet>
 
                     <Link
-                        to="/"
-                        className="flex min-w-0 items-center hover:opacity-90 transition-opacity"
+                      to="/"
+                      className="flex min-w-0 items-center hover:opacity-90 transition-opacity"
                     >
                         <img
                             src={logo}

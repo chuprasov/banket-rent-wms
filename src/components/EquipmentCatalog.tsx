@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Search, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
+import { Search, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { WarehouseStockCell } from "@/components/WarehouseStockCell"
 import { CatalogRecordDialog } from "@/components/CatalogRecordDialog"
 import { catalogRequest } from "@/lib/catalog-api"
 import { useAuth } from "@/context/AuthContext"
@@ -22,6 +23,7 @@ interface Equipment {
     category_name: string | null
     rent_price: string | null
     balance: number | null
+    warehouses: { id: number; quantity: number }[]
     update_date: string
 }
 
@@ -36,12 +38,12 @@ const API_URL = import.meta.env.VITE_API_URL
 
 const sortFields = [
     { key: "id", label: "ID оборудования" },
-    { key: "name", label: "Наименование", className: "w-[350px]" },
+    { key: "name", label: "Наименование", className: "sticky left-0 z-20 w-[350px] bg-muted shadow-[1px_0_0_var(--border)]" },
     { key: "code", label: "Код" },
     { key: "category_id", label: "ID категории" },
     { key: "category_name", label: "Категория" },
     { key: "rent_price", label: "Цена аренды", className: "text-right" },
-    { key: "balance", label: "Остаток", className: "text-center" },
+    { key: "balance", label: "Общее количество", className: "text-center" },
     { key: "update_date", label: "Обновлено", className: "w-[180px] whitespace-nowrap" },
 ] as const
 type SortField = typeof sortFields[number]["key"]
@@ -49,6 +51,7 @@ type SortField = typeof sortFields[number]["key"]
 export function EquipmentCatalog() {
     const { token } = useAuth()
     const [equipment, setEquipment] = useState<Equipment[]>([])
+    const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([])
     const [pagination, setPagination] = useState<PaginationMeta | null>(null)
     const [searchQuery, setSearchQuery] = useState("")
     const [isLoading, setIsLoading] = useState(true)
@@ -87,6 +90,11 @@ export function EquipmentCatalog() {
                 throw new Error("Не удалось загрузить оборудование")
             }
 
+            const warehouseResponse = await fetch(`${API_URL}/api/warehouses`, {
+                headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+            })
+            if (!warehouseResponse.ok) throw new Error("Не удалось загрузить склады. Обновите список.")
+            const warehouseResult = await warehouseResponse.json()
             const result = await response.json()
             if (version !== requestVersion.current) return
 
@@ -95,6 +103,7 @@ export function EquipmentCatalog() {
                 return
             }
 
+            setWarehouses(warehouseResult.data)
             setEquipment(result.data)
             setPagination(result.meta)
         } catch (err) {
@@ -221,9 +230,8 @@ export function EquipmentCatalog() {
                       { name: "name", label: "Название", required: true, maxLength: 255 },
                       { name: "code", label: "Код", required: true, maxLength: 80 },
                       { name: "rent_price", label: "Цена аренды, руб.", type: "number", min: 0, step: "0.01" },
-                      { name: "balance", label: "Остаток", type: "number", min: 0, max: 2147483647, step: "1" },
                   ]}
-                  initialValues={{ name: editor.item?.name ?? "", code: editor.item?.code ?? "", rent_price: editor.item?.rent_price ?? "", balance: editor.item?.balance?.toString() ?? "" }}
+                  initialValues={{ name: editor.item?.name ?? "", code: editor.item?.code ?? "", rent_price: editor.item?.rent_price ?? "" }}
                   onClose={() => setEditor(null)}
                   onSubmit={async (values) => {
                       const path = editor.mode === "create" ? "catalog-equipment" : `catalog-equipment/${editor.item!.id}`
@@ -232,7 +240,6 @@ export function EquipmentCatalog() {
                               name: values.name,
                               code: values.code,
                               rent_price: values.rent_price || null,
-                              balance: values.balance ? Number(values.balance) : null,
                           })
                       if (editor.mode === "create") setSearchQuery("")
                       await loadEquipment(editor.mode === "create" ? 1 : pagination?.current_page ?? 1)
@@ -240,6 +247,10 @@ export function EquipmentCatalog() {
               />
           )}
 
+          <p className="text-sm text-muted-foreground">
+              Остаток сохраняется автоматически при выходе из ячейки или по Enter.
+              {warehouses.length === 0 && !isLoading && !error && " Сначала добавьте склад в настройках."}
+          </p>
           <div className="border border-border rounded-lg overflow-hidden bg-card">
               <Table>
                   <TableHeader className="bg-muted/50">
@@ -261,7 +272,12 @@ export function EquipmentCatalog() {
                                   </button>
                               </TableHead>
                           ))}
-                          <TableHead className="text-right">Действия</TableHead>
+                          {warehouses.map((warehouse) => (
+                              <TableHead key={warehouse.id} className="w-[88px] px-1 text-center">
+                                  <div className="w-20 whitespace-normal break-words py-1" title={warehouse.name}>{warehouse.name}</div>
+                              </TableHead>
+                          ))}
+                          <TableHead className="w-10 px-1"><span className="sr-only">Действия</span></TableHead>
                       </TableRow>
                   </TableHeader>
 
@@ -269,21 +285,19 @@ export function EquipmentCatalog() {
                       {isLoading ? (
                         <TableRow>
                             <TableCell
-                              colSpan={7}
+                              colSpan={7 + warehouses.length}
                               className="text-center py-12"
                             >
                                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
                                     <Loader2 className="h-5 w-5 animate-spin" />
-                                    <span>
-                                            Загрузка данных...
-                                        </span>
+                                    <span>Загрузка данных...</span>
                                 </div>
                             </TableCell>
                         </TableRow>
                       ) : error ? (
                         <TableRow>
                             <TableCell
-                              colSpan={7}
+                              colSpan={7 + warehouses.length}
                               className="text-center py-8 text-destructive"
                             >
                                 {error}
@@ -295,10 +309,15 @@ export function EquipmentCatalog() {
                             key={item.id}
                             className="hover:bg-muted/30"
                           >
-                              <TableCell>
-                                  <div className="font-medium text-foreground">
+                              <TableCell className="sticky left-0 z-10 bg-card shadow-[1px_0_0_var(--border)]">
+                                  <button
+                                      type="button"
+                                      className="block w-[200px] sm:w-[320px] whitespace-normal break-words text-left font-medium text-foreground cursor-pointer hover:text-primary hover:underline rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                                      onClick={() => setEditor({ mode: "edit", item })}
+                                      title="Редактировать оборудование"
+                                  >
                                       {item.name}
-                                  </div>
+                                  </button>
                               </TableCell>
 
                               <TableCell>
@@ -318,10 +337,8 @@ export function EquipmentCatalog() {
                                   руб.
                               </TableCell>
 
-                              <TableCell className="text-center">
-                                  {item.balance ?? "—"}
-                              </TableCell>
 
+                              <TableCell className="text-center">{item.balance ?? "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                                   {item.update_date
                                     ? new Date(
@@ -329,10 +346,30 @@ export function EquipmentCatalog() {
                                     ).toLocaleString("ru-RU")
                                     : "—"}
                               </TableCell>
-                              <TableCell>
-                                  <div className="flex justify-end gap-2">
-                                      <Button variant="outline" size="sm" onClick={() => setEditor({ mode: "edit", item })}>Изменить</Button>
-                                      <Button variant="destructive" size="sm" onClick={() => setEditor({ mode: "delete", item })}>Удалить</Button>
+                              {warehouses.map((warehouse) => (
+                                  <TableCell key={warehouse.id} className="w-[88px] px-1 align-top">
+                                      <WarehouseStockCell
+                                          key={`${item.id}-${warehouse.id}-${item.warehouses.find((stock) => stock.id === warehouse.id)?.quantity ?? 0}`}
+                                          equipmentId={item.id}
+                                          equipmentName={item.name}
+                                          warehouse={warehouse}
+                                          quantity={item.warehouses.find((stock) => stock.id === warehouse.id)?.quantity ?? 0}
+                                          token={token}
+                                      />
+                                  </TableCell>
+                              ))}
+                              <TableCell className="w-10 px-1">
+                                  <div className="flex justify-center">
+                                      <Button
+                                          variant="ghost"
+                                          size="icon-sm"
+                                          className="text-destructive hover:text-destructive"
+                                          title="Удалить оборудование"
+                                          aria-label={`Удалить ${item.name}`}
+                                          onClick={() => setEditor({ mode: "delete", item })}
+                                      >
+                                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                      </Button>
                                   </div>
                               </TableCell>
                           </TableRow>
@@ -340,7 +377,7 @@ export function EquipmentCatalog() {
                       ) : (
                         <TableRow>
                             <TableCell
-                              colSpan={7}
+                              colSpan={7 + warehouses.length}
                               className="text-center py-8 text-muted-foreground"
                             >
                                 Ничего не найдено

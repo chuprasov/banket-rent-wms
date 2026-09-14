@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { CatalogRecordDialog } from "@/components/CatalogRecordDialog"
@@ -17,7 +17,6 @@ interface Warehouse {
     id: number | string
     name: string
     address: string | null
-    phone: string | null
 }
 
 const API_URL = import.meta.env.VITE_API_URL
@@ -66,9 +65,8 @@ export function Warehouses() {
                 if (!Array.isArray(items) || !items.every((item) =>
                     item && (typeof item.id === "number" || typeof item.id === "string") &&
                     typeof item.name === "string" &&
-                    (item.address == null || typeof item.address === "string") &&
-                    (item.phone == null || typeof item.phone === "string")
-                )) {
+                    (item.address == null || typeof item.address === "string"))
+                ) {
                     throw new Error("Сервер вернул некорректный список складов")
                 }
 
@@ -97,9 +95,8 @@ export function Warehouses() {
                     fields={[
                         { name: "name", label: "Название", required: true, maxLength: 255 },
                         { name: "address", label: "Адрес", required: true, maxLength: 255 },
-                        { name: "phone", label: "Телефон", required: true, type: "tel", maxLength: 50 },
                     ]}
-                    initialValues={{ name: editor.item?.name ?? "", address: editor.item?.address ?? "", phone: editor.item?.phone ?? "" }}
+                    initialValues={{ name: editor.item?.name ?? "", address: editor.item?.address ?? "" }}
                     onClose={() => setEditor(null)}
                     onSubmit={async (values) => {
                         const path = editor.mode === "create" ? "warehouses" : `warehouses/${encodeURIComponent(String(editor.item!.id))}`
@@ -116,14 +113,13 @@ export function Warehouses() {
                         <TableRow>
                             <TableHead>Название</TableHead>
                             <TableHead>Адрес</TableHead>
-                            <TableHead>Телефон</TableHead>
-                            <TableHead className="text-right">Действия</TableHead>
+                            <TableHead className="w-10 px-1"><span className="sr-only">Действия</span></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center py-12">
+                                <TableCell colSpan={3} className="text-center py-12">
                                     <div role="status" className="flex items-center justify-center gap-2 text-muted-foreground">
                                         <Loader2 className="h-5 w-5 animate-spin" />
                                         Загрузка складов...
@@ -132,7 +128,7 @@ export function Warehouses() {
                             </TableRow>
                         ) : error ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center py-8">
+                                <TableCell colSpan={3} className="text-center py-8">
                                     <p role="alert" className="text-destructive mb-3">{error}</p>
                                     <Button variant="outline" onClick={() => setReload((value) => value + 1)}>
                                         Повторить загрузку
@@ -141,19 +137,35 @@ export function Warehouses() {
                             </TableRow>
                         ) : warehouses.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                                     Склады не найдены
                                 </TableCell>
                             </TableRow>
                         ) : warehouses.map((warehouse) => (
                             <TableRow key={warehouse.id} className="hover:bg-muted/30">
-                                <TableCell className="font-medium">{warehouse.name}</TableCell>
-                                <TableCell className="whitespace-normal">{warehouse.address || "—"}</TableCell>
-                                <TableCell>{warehouse.phone || "—"}</TableCell>
                                 <TableCell>
-                                    <div className="flex justify-end gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => setEditor({ mode: "edit", item: warehouse })}>Изменить</Button>
-                                        <Button variant="destructive" size="sm" onClick={() => setEditor({ mode: "delete", item: warehouse })}>Удалить</Button>
+                                    <button
+                                        type="button"
+                                        className="text-left font-medium cursor-pointer hover:text-primary hover:underline rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                                        title="Редактировать склад"
+                                        onClick={() => setEditor({ mode: "edit", item: warehouse })}
+                                    >
+                                        {warehouse.name}
+                                    </button>
+                                </TableCell>
+                                <TableCell className="whitespace-normal">{warehouse.address || "—"}</TableCell>
+                                <TableCell className="w-10 px-1">
+                                    <div className="flex justify-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            className="text-destructive hover:text-destructive"
+                                            title="Удалить склад"
+                                            aria-label={`Удалить ${warehouse.name}`}
+                                            onClick={() => setEditor({ mode: "delete", item: warehouse })}
+                                        >
+                                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                        </Button>
                                     </div>
                                 </TableCell>
                             </TableRow>
