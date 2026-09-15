@@ -12,7 +12,17 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export function AuthModal({
+    isOpen,
+    onClose,
+    onAuthenticated,
+    isDismissible = true,
+}: {
+    isOpen: boolean
+    onClose: () => void
+    onAuthenticated?: () => void
+    isDismissible?: boolean
+}) {
     const { loginWithLogin, /*loginWithEmail,*/ registerInit, registerConfirm } = useAuth()
 
     const [mode, setMode] = useState<"login" | "register" | "otp">("login")
@@ -46,6 +56,7 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
         try {
             if (mode === "otp") {
                 await registerConfirm(email, otpCode)
+                onAuthenticated?.()
                 onClose()
             } else if (mode === "register") {
                 await registerInit(name, email, password)
@@ -53,6 +64,7 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
             } else {
                 await loginWithLogin(login, password)
                 //await loginWithEmail(email, password)
+                onAuthenticated?.()
                 onClose()
             }
         } catch (err) {
@@ -63,8 +75,8 @@ export function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[400px]">
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && isDismissible) onClose() }}>
+            <DialogContent showCloseButton={isDismissible} className="sm:max-w-[400px]">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold text-center">
                         {mode === "otp"

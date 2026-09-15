@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
             const response = await fetch(
-              `${API_URL}/api/auth/me`,
+              `${API_URL}/api/auth/user`,
               {
                   headers: {
                       Accept: "application/json",
@@ -85,10 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   },
               }
             )
-
-            if (!response.ok) {
-                throw new Error("Unauthorized")
-            }
 
             const result = await response.json();
 

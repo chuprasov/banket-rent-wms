@@ -8,11 +8,13 @@ export interface CatalogField {
     name: string
     label: string
     required?: boolean
-    type?: "text" | "tel" | "number"
+    type?: "text" | "tel" | "number" | "select"
     maxLength?: number
     min?: number
     max?: number
     step?: string
+    readOnly?: boolean
+    options?: { value: string; label: string }[]
 }
 
 interface Props {
@@ -64,17 +66,33 @@ export function CatalogRecordDialog({ title, fields = [], initialValues = {}, de
                     {!deleting && fields.map((field) => (
                         <label key={field.name} className="block space-y-2">
                             <span>{field.label}{field.required ? " *" : ""}</span>
-                            <Input
-                                type={field.type || "text"}
-                                required={field.required}
-                                maxLength={field.maxLength}
-                                min={field.min}
-                                max={field.max}
-                                step={field.step}
-                                value={values[field.name] ?? ""}
-                                disabled={busy}
-                                onChange={(event) => setValues({ ...values, [field.name]: event.target.value })}
-                            />
+                            {field.type === "select" ? (
+                                <select
+                                    required={field.required}
+                                    value={values[field.name] ?? ""}
+                                    disabled={busy || field.readOnly}
+                                    className="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onChange={(event) => setValues({ ...values, [field.name]: event.target.value })}
+                                >
+                                    {field.options?.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <Input
+                                    type={field.type || "text"}
+                                    required={field.required}
+                                    maxLength={field.maxLength}
+                                    min={field.min}
+                                    max={field.max}
+                                    step={field.step}
+                                    readOnly={field.readOnly}
+                                    value={values[field.name] ?? ""}
+                                    disabled={busy}
+                                    className={field.readOnly ? "bg-muted font-mono" : undefined}
+                                    onChange={(event) => setValues({ ...values, [field.name]: event.target.value })}
+                                />
+                            )}
                         </label>
                     ))}
                     {error && <p role="alert" className="text-destructive whitespace-pre-line">{error}</p>}

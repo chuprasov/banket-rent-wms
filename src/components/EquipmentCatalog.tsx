@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Search, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from "lucide-react"
+import { Search, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Trash2, Columns3 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { WarehouseStockCell } from "@/components/WarehouseStockCell"
@@ -34,11 +34,19 @@ interface PaginationMeta {
     total: number
 }
 
+interface CatalogCategory {
+    id: number
+    name: string | null
+    code: string | null
+    is_hidden: boolean
+}
+
 const API_URL = import.meta.env.VITE_API_URL
+const COLUMN_VISIBILITY_KEY = "equipment-table-hidden-columns"
 
 const sortFields = [
-    { key: "id", label: "ID оборудования" },
-    { key: "name", label: "Наименование", className: "sticky left-0 z-20 w-[350px] bg-muted shadow-[1px_0_0_var(--border)]" },
+    { key: "name", label: "Наименование", className: "sticky left-0 z-20 w-[200px] bg-muted shadow-[1px_0_0_var(--border)]" },
+    { key: "id", label: "Артикул" },
     { key: "code", label: "Код" },
     { key: "category_id", label: "ID категории" },
     { key: "category_name", label: "Категория" },
@@ -52,13 +60,32 @@ export function EquipmentCatalog() {
     const { token } = useAuth()
     const [equipment, setEquipment] = useState<Equipment[]>([])
     const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([])
+    const [categories, setCategories] = useState<CatalogCategory[]>([])
     const [pagination, setPagination] = useState<PaginationMeta | null>(null)
     const [searchQuery, setSearchQuery] = useState("")
+    const [search, setSearch] = useState("")
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [editor, setEditor] = useState<{ mode: "create" | "edit" | "delete"; item?: Equipment } | null>(null)
-    const [sort, setSort] = useState<{ field: SortField; direction: "asc" | "desc" }>({ field: "id", direction: "asc" })
+    const [sort, setSort] = useState<{ field: SortField; direction: "asc" | "desc" }>({ field: "id", direction: "desc" })
+    const [hiddenColumns, setHiddenColumns] = useState<string[]>(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(COLUMN_VISIBILITY_KEY) ?? "[]")
+            return Array.isArray(saved) ? saved.filter((value): value is string => typeof value === "string") : []
+        } catch {
+            return []
+        }
+    })
     const requestVersion = useRef(0)
+
+    useEffect(() => {
+        localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(hiddenColumns))
+    }, [hiddenColumns])
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setSearch(searchQuery.trim()), 500)
+        return () => window.clearTimeout(timer)
+    }, [searchQuery])
 
     const loadEquipment = useCallback(async function loadPage(page = 1) {
         const version = ++requestVersion.current
@@ -70,8 +97,16 @@ export function EquipmentCatalog() {
                 throw new Error("Для просмотра оборудования необходимо войти в аккаунт")
             }
 
+            const query = new URLSearchParams({
+                page: String(page),
+                per_page: "50",
+                sort_by: sort.field,
+                sort_direction: sort.direction,
+            })
+            if (search) query.set("search", search)
+
             const response = await fetch(
-              `${API_URL}/api/catalog-equipment?page=${page}&per_page=50&sort_by=${sort.field}&sort_direction=${sort.direction}`,
+              `${API_URL}/api/catalog-equipment?${query.toString()}`,
               {
                   headers: {
                       Accept: "application/json",
@@ -94,7 +129,12 @@ export function EquipmentCatalog() {
                 headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
             })
             if (!warehouseResponse.ok) throw new Error("Не удалось загрузить склады. Обновите список.")
+            const categoryResponse = await fetch(`${API_URL}/api/catalog-categories`, {
+                headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+            })
+            if (!categoryResponse.ok) throw new Error("Не удалось загрузить категории. Обновите список.")
             const warehouseResult = await warehouseResponse.json()
+            const categoryResult = await categoryResponse.json()
             const result = await response.json()
             if (version !== requestVersion.current) return
 
@@ -104,6 +144,7 @@ export function EquipmentCatalog() {
             }
 
             setWarehouses(warehouseResult.data)
+            setCategories(categoryResult.data)
             setEquipment(result.data)
             setPagination(result.meta)
         } catch (err) {
@@ -118,7 +159,7 @@ export function EquipmentCatalog() {
         } finally {
             if (version === requestVersion.current) setIsLoading(false)
         }
-    }, [token, sort])
+    }, [token, sort, search])
 
     useEffect(() => {
         void loadEquipment()
@@ -132,18 +173,16 @@ export function EquipmentCatalog() {
         }))
     }
 
-    const filteredEquipment = equipment.filter((item) => {
-        const query = searchQuery.toLowerCase().trim()
-
-        if (!query) {
-            return true
-        }
-
-        return (
-          item.name?.toLowerCase().includes(query) ||
-          item.code?.toLowerCase().includes(query)
-        )
-    })
+    const isColumnVisible = (key: string) => !hiddenColumns.includes(key)
+    const toggleColumn = (key: string) => {
+        setHiddenColumns((current) => current.includes(key)
+            ? current.filter((column) => column !== key)
+            : [...current, key])
+    }
+    const visibleColumnCount = 1
+        + sortFields.filter((field) => field.key !== "name" && field.key !== "category_id" && isColumnVisible(field.key)).length
+        + warehouses.filter((warehouse) => isColumnVisible(`warehouse:${warehouse.id}`)).length
+        + (isColumnVisible("actions") ? 1 : 0)
 
     const getPageNumbers = (
       currentPage: number,
@@ -182,14 +221,14 @@ export function EquipmentCatalog() {
     }
 
     return (
-      <div className="p-6 md:p-10 space-y-6 max-w-none mx-auto">
+      <div className="w-full min-w-0 space-y-6 px-3 py-6 sm:px-6 md:px-10 md:py-10">
           <div>
               {/*<h1 className="text-3xl font-serif font-bold tracking-tight">
                   Каталог оборудования
               </h1>*/}
 
               <p className="text-muted-foreground mt-1">
-                  Список оборудования
+                  Каталог оборудования
               </p>
           </div>
 
@@ -201,12 +240,43 @@ export function EquipmentCatalog() {
                 placeholder="Поиск оборудования"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                maxLength={255}
                 className="pl-9 bg-background border-border"
               />
           </div>
 
-          <Button onClick={() => setEditor({ mode: "create" })}>Добавить оборудование</Button>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+              <Button onClick={() => setEditor({ mode: "create" })}>Добавить</Button>
+              <details className="relative">
+                  <summary className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm font-medium hover:bg-muted [&::-webkit-details-marker]:hidden">
+                      <Columns3 className="size-4" aria-hidden="true" />
+                      Столбцы
+                  </summary>
+                  <div className="absolute right-0 z-40 mt-2 max-h-[min(28rem,70vh)] min-w-56 overflow-y-auto rounded-lg border border-border bg-popover p-2 text-sm text-popover-foreground shadow-lg">
+                      <p className="px-2 pb-2 font-medium">Видимые столбцы</p>
+                      {sortFields.filter((field) => field.key !== "name" && field.key !== "category_id").map((field) => (
+                          <label key={field.key} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                              <input type="checkbox" checked={isColumnVisible(field.key)} onChange={() => toggleColumn(field.key)} />
+                              {field.label}
+                          </label>
+                      ))}
+                      {warehouses.map((warehouse) => (
+                          <label key={warehouse.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                              <input type="checkbox" checked={isColumnVisible(`warehouse:${warehouse.id}`)} onChange={() => toggleColumn(`warehouse:${warehouse.id}`)} />
+                              Склад: {warehouse.name}
+                          </label>
+                      ))}
+                      <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                          <input type="checkbox" checked={isColumnVisible("actions")} onChange={() => toggleColumn("actions")} />
+                          Удаление
+                      </label>
+                      <Button type="button" variant="ghost" size="sm" className="mt-2 w-full" onClick={() => setHiddenColumns([])}>
+                          Показать все
+                      </Button>
+                  </div>
+              </details>
+          </div>
+          {/*<div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm">
                   Сортировать по
                   <select
@@ -221,17 +291,30 @@ export function EquipmentCatalog() {
                   {sort.direction === "asc" ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />}
                   {sort.direction === "asc" ? "По возрастанию" : "По убыванию"}
               </Button>
-          </div>
+          </div>*/}
           {editor && (
               <CatalogRecordDialog
                   title={editor.mode === "delete" ? "Удаление оборудования" : editor.mode === "edit" ? "Редактирование оборудования" : "Новое оборудование"}
                   deleteName={editor.mode === "delete" ? editor.item!.name : undefined}
                   fields={[
+                      ...(editor.mode === "edit" ? [{ name: "id", label: "Артикул", readOnly: true }] : []),
                       { name: "name", label: "Название", required: true, maxLength: 255 },
                       { name: "code", label: "Код", required: true, maxLength: 80 },
+                      {
+                          name: "category_id",
+                          label: "Категория",
+                          type: "select",
+                          options: [
+                              { value: "", label: "Без категории" },
+                              ...categories.map((category) => ({
+                                  value: String(category.id),
+                                  label: `${category.name || category.code || `Категория ${category.id}`}${category.is_hidden ? " (скрыта)" : ""}`,
+                              })),
+                          ],
+                      },
                       { name: "rent_price", label: "Цена аренды, руб.", type: "number", min: 0, step: "0.01" },
                   ]}
-                  initialValues={{ name: editor.item?.name ?? "", code: editor.item?.code ?? "", rent_price: editor.item?.rent_price ?? "" }}
+                  initialValues={{ id: editor.item ? String(editor.item.id).padStart(6, "0") : "", name: editor.item?.name ?? "", code: editor.item?.code ?? "", category_id: editor.item?.category_id?.toString() ?? "", rent_price: editor.item?.rent_price ?? "" }}
                   onClose={() => setEditor(null)}
                   onSubmit={async (values) => {
                       const path = editor.mode === "create" ? "catalog-equipment" : `catalog-equipment/${editor.item!.id}`
@@ -239,6 +322,7 @@ export function EquipmentCatalog() {
                           editor.mode === "delete" ? undefined : {
                               name: values.name,
                               code: values.code,
+                              category_id: values.category_id ? Number(values.category_id) : null,
                               rent_price: values.rent_price || null,
                           })
                       if (editor.mode === "create") setSearchQuery("")
@@ -247,15 +331,15 @@ export function EquipmentCatalog() {
               />
           )}
 
-          <p className="text-sm text-muted-foreground">
+          {/*<p className="text-sm text-muted-foreground">
               Остаток сохраняется автоматически при выходе из ячейки или по Enter.
               {warehouses.length === 0 && !isLoading && !error && " Сначала добавьте склад в настройках."}
-          </p>
-          <div className="border border-border rounded-lg overflow-hidden bg-card">
-              <Table>
+          </p>*/}
+          <div className="w-full min-w-0 border border-border rounded-lg overflow-hidden bg-card">
+              <Table className="min-w-max">
                   <TableHeader className="bg-muted/50">
                       <TableRow>
-                          {sortFields.filter((field) => field.key !== "id" && field.key !== "category_id").map((field) => (
+                          {sortFields.filter((field) => field.key !== "category_id" && (field.key === "name" || isColumnVisible(field.key))).map((field) => (
                               <TableHead
                                   key={field.key}
                                   className={"className" in field ? field.className : undefined}
@@ -272,12 +356,12 @@ export function EquipmentCatalog() {
                                   </button>
                               </TableHead>
                           ))}
-                          {warehouses.map((warehouse) => (
+                          {warehouses.filter((warehouse) => isColumnVisible(`warehouse:${warehouse.id}`)).map((warehouse) => (
                               <TableHead key={warehouse.id} className="w-[88px] px-1 text-center">
                                   <div className="w-20 whitespace-normal break-words py-1" title={warehouse.name}>{warehouse.name}</div>
                               </TableHead>
                           ))}
-                          <TableHead className="w-10 px-1"><span className="sr-only">Действия</span></TableHead>
+                          {isColumnVisible("actions") && <TableHead className="w-10 px-1"><span className="sr-only">Действия</span></TableHead>}
                       </TableRow>
                   </TableHeader>
 
@@ -285,7 +369,7 @@ export function EquipmentCatalog() {
                       {isLoading ? (
                         <TableRow>
                             <TableCell
-                              colSpan={7 + warehouses.length}
+                              colSpan={visibleColumnCount}
                               className="text-center py-12"
                             >
                                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
@@ -297,14 +381,14 @@ export function EquipmentCatalog() {
                       ) : error ? (
                         <TableRow>
                             <TableCell
-                              colSpan={7 + warehouses.length}
+                              colSpan={visibleColumnCount}
                               className="text-center py-8 text-destructive"
                             >
                                 {error}
                             </TableCell>
                         </TableRow>
-                      ) : filteredEquipment.length > 0 ? (
-                        filteredEquipment.map((item) => (
+                      ) : equipment.length > 0 ? (
+                        equipment.map((item) => (
                           <TableRow
                             key={item.id}
                             className="hover:bg-muted/30"
@@ -319,34 +403,37 @@ export function EquipmentCatalog() {
                                       {item.name}
                                   </button>
                               </TableCell>
+                              {isColumnVisible("id") && <TableCell className="font-mono tabular-nums">
+                                  {String(item.id).padStart(6, "0")}
+                              </TableCell>}
 
-                              <TableCell>
+                              {isColumnVisible("code") && <TableCell>
                                   <div className="text-xs text-muted-foreground font-mono">
                                       {item.code}
                                   </div>
-                              </TableCell>
+                              </TableCell>}
 
-                              <TableCell className="text-muted-foreground">
+                              {isColumnVisible("category_name") && <TableCell className="text-muted-foreground">
                                   {item.category_name ?? "—"}
-                              </TableCell>
+                              </TableCell>}
 
-                              <TableCell className="text-right font-semibold whitespace-nowrap">
+                              {isColumnVisible("rent_price") && <TableCell className="text-right font-semibold whitespace-nowrap">
                                   {item.rent_price == null ? "—" : Number(
                                     item.rent_price
                                   ).toLocaleString("ru-RU")}{" "}
                                   руб.
-                              </TableCell>
+                              </TableCell>}
 
 
-                              <TableCell className="text-center">{item.balance ?? "—"}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                              {isColumnVisible("balance") && <TableCell className="text-center">{item.balance ?? "—"}</TableCell>}
+                              {isColumnVisible("update_date") && <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                                   {item.update_date
                                     ? new Date(
                                       item.update_date
                                     ).toLocaleString("ru-RU")
                                     : "—"}
-                              </TableCell>
-                              {warehouses.map((warehouse) => (
+                              </TableCell>}
+                              {warehouses.filter((warehouse) => isColumnVisible(`warehouse:${warehouse.id}`)).map((warehouse) => (
                                   <TableCell key={warehouse.id} className="w-[88px] px-1 align-top">
                                       <WarehouseStockCell
                                           key={`${item.id}-${warehouse.id}-${item.warehouses.find((stock) => stock.id === warehouse.id)?.quantity ?? 0}`}
@@ -358,7 +445,7 @@ export function EquipmentCatalog() {
                                       />
                                   </TableCell>
                               ))}
-                              <TableCell className="w-10 px-1">
+                              {isColumnVisible("actions") && <TableCell className="w-10 px-1">
                                   <div className="flex justify-center">
                                       <Button
                                           variant="ghost"
@@ -371,13 +458,13 @@ export function EquipmentCatalog() {
                                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                                       </Button>
                                   </div>
-                              </TableCell>
+                              </TableCell>}
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
                             <TableCell
-                              colSpan={7 + warehouses.length}
+                              colSpan={visibleColumnCount}
                               className="text-center py-8 text-muted-foreground"
                             >
                                 Ничего не найдено

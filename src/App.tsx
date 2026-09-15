@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext"
 import { Header } from "@/components/Header"
 import { EquipmentCatalog } from "@/components/EquipmentCatalog"
 import { Warehouses } from "@/components/Warehouses"
+import { NavigationMenu } from "@/components/NavigationMenu"
 
 function RequireAuth() {
   const { isLoggedIn, isLoading } = useAuth()
@@ -23,22 +24,37 @@ function HomePage() {
   )
 }
 
+function AppContent() {
+  const { isLoggedIn, isLoading } = useAuth()
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <Header />
+      <div className="flex min-w-0 items-start">
+        {!isLoading && isLoggedIn && (
+          <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-[175px] shrink-0 overflow-y-auto border-r border-border/40 bg-background px-2 py-4 md:block">
+            <NavigationMenu />
+          </aside>
+        )}
+        <main className="min-w-0 flex-1">
+          <Routes>
+            <Route path="/" element={isLoggedIn ? <Navigate to="/catalog" replace /> : <HomePage />} />
+            <Route element={<RequireAuth />}>
+              <Route path="/catalog" element={<EquipmentCatalog />} />
+              <Route path="/settings/warehouses" element={<Warehouses />} />
+            </Route>
+          </Routes>
+        </main>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-background text-foreground">
-          <Header />
-          <main className="container w-full">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route element={<RequireAuth />}>
-                <Route path="/catalog" element={<EquipmentCatalog />} />
-                <Route path="/settings/warehouses" element={<Warehouses />} />
-              </Route>
-            </Routes>
-          </main>
-        </div>
+        <AppContent />
       </BrowserRouter>
     </AuthProvider>
   )
